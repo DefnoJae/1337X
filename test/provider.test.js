@@ -57,9 +57,14 @@ test('magnet extraction decodes HTML entities and caches detail fetch', async ()
 test('empty results, HTTP failures, challenges and changed layouts are distinct', async () => {
     assert.equal((await provider('<body>No results found</body>').p.getLatest()).length, 0);
     await assert.rejects(provider('blocked', 503).p.getLatest(), /ChromeDP is unavailable/);
-    await assert.rejects(provider('<body>Just a moment</body>').p.getLatest(), /verification/);
+    await assert.rejects(provider('<title>Just a moment</title>').p.getLatest(), /verification/);
     await assert.rejects(provider('<body>Unknown page</body>').p.getLatest(), /unexpected/);
     await assert.rejects(provider('<body>No magnet</body>').p.getTorrentMagnetLink({ link: 'https://ext.to/show-1/' }), /requires Seanime ChromeDP/);
+});
+test('ordinary EXT captcha script references are not mistaken for challenge pages',()=>{
+    const {p}=provider('');
+    assert.equal(p.isChallenge('<title>Search EXT</title><script src="/captcha.js"></script>'),false);
+    assert.equal(p.isChallenge('<title>Just a moment...</title>'),true);
 });
 test('challenge response retries in Chrome and closes the browser', async () => {
     let closed = 0;
@@ -131,4 +136,19 @@ test('token-based magnets use the browser session and correct signature', async 
     const p = vm.runInContext(source + ';new Provider()',context);
     assert.equal(await p.getTorrentInfoHash({link:'https://ext.to/show-123/'}),hash);
     assert.equal(closed,1);
+});
+test('Cloak helper mode routes search and magnets over authenticated loopback',async()=>{
+    const calls=[];
+    const hash='abcdef0123456789abcdef0123456789abcdef01';
+    const context=vm.createContext({LoadDoc,$getUserPreference:key=>({browserMode:'cloak',helperToken:'test-token'}[key]),fetch:async(url,options)=>{
+        calls.push({url,options});
+        return {ok:true,json:()=>url.endsWith('/page')?{html}:{magnet:'magnet:?xt=urn:btih:'+hash}};
+    }});
+    const p=vm.runInContext(source+';new Provider()',context);
+    assert.equal((await p.search({query:'Show'})).length,3);
+    assert.equal(await p.getTorrentInfoHash({link:'https://ext.to/show-123/'}),hash);
+    assert.equal(calls.length,2);
+    assert.equal(calls[0].url,'http://127.0.0.1:18731/page');
+    assert.equal(calls[0].options.headers.Authorization,'Bearer test-token');
+    assert.equal(calls[1].url,'http://127.0.0.1:18731/magnet');
 });

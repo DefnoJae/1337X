@@ -2,11 +2,29 @@
 class Provider {
     base = "https://ext.to";
 
+    helperEnabled() {
+        return typeof $getUserPreference === "function" && $getUserPreference("browserMode") === "cloak";
+    }
+
+    async helperRequest(endpoint, path) {
+        const token = $getUserPreference("helperToken") || "";
+        if (!token) throw new Error("Set the local CloakBrowser helper token in EXT Torrents configuration.");
+        const response = await fetch("http://127.0.0.1:18731" + endpoint, {
+            method: "POST", timeout: 180,
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+            body: JSON.stringify({path})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Local EXT helper HTTP " + response.status);
+        return data;
+    }
+
     getSettings() {
         return { canSmartSearch: true, smartSearchFilters: ["query", "batch", "episodeNumber", "resolution"], supportsAdult: false, type: "main" };
     }
 
     async page(path) {
+        if (this.helperEnabled()) return LoadDoc((await this.helperRequest("/page", path)).html);
         const url = this.base + path;
         try {
             const response = await fetch(url);
@@ -25,7 +43,7 @@ class Provider {
     }
 
     isChallenge(html) {
-        return /cf-chl-|Just a moment|Attention Required|captcha/i.test(html);
+        return /<title[^>]*>\s*(?:Just a moment|Attention Required)/i.test(html) || /id=["']challenge-(?:running|stage)["']/i.test(html);
     }
 
     browserOptions() {
@@ -141,6 +159,12 @@ class Provider {
         if (torrent.magnetLink) return torrent.magnetLink;
         // Only request detail pages on the configured origin.
         if (!torrent.link || torrent.link.indexOf(this.base + "/") !== 0 || !/^\/(?!\/)[^?#]+-\d+\/?$/.test(torrent.link.slice(this.base.length))) throw new Error("Invalid EXT.to detail URL");
+        if (this.helperEnabled()) {
+            const data = await this.helperRequest("/magnet", torrent.link.slice(this.base.length));
+            if (!data.magnet || !/[?&]xt=urn:btih:([a-f0-9]{40}|[a-z2-7]{32})(?:&|$)/i.test(data.magnet)) throw new Error("Local EXT helper returned an invalid magnet");
+            torrent.magnetLink = data.magnet;
+            return data.magnet;
+        }
         const $ = await this.page(torrent.link.slice(this.base.length));
         let magnet = $('a[href^="magnet:?"]').first().attr("href");
         if (!magnet) magnet = await this.resolveMagnetInBrowser(torrent.link);

@@ -3,9 +3,14 @@
   "private": true,
   "scripts": {
     "test": "node --test",
-    "check": "node --check provider.js"
+    "check": "node --check provider.js && node --check helper/server.mjs",
+    "helper": "node helper/server.mjs"
   },
   "devDependencies": {
     "cheerio": "1.1.2"
+  },
+  "dependencies": {
+    "cloakbrowser": "0.6.3",
+    "playwright-core": "1.64.1"
   }
 }
