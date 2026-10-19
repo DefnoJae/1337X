@@ -7,13 +7,42 @@ class Provider {
     }
 
     async page(path) {
-        const response = await fetch(this.base + path);
-        if (!response.ok) throw new Error("1337x request failed: " + response.status);
-        const html = await response.text();
-        if (/cf-chl-|Just a moment|Attention Required|captcha/i.test(html)) {
-            throw new Error("1337x is requesting browser verification. Try again later.");
+        const url = this.base + path;
+        try {
+            const response = await fetch(url);
+            const html = await response.text();
+            if (this.isChallenge(html) || response.status === 403 || response.status === 503) {
+                console.warn("1337x: HTTP " + response.status + "; trying Seanime Chrome browser for " + url);
+                return LoadDoc(await this.browserPage(url, path));
+            }
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return LoadDoc(html);
+        } catch (error) {
+            const message = "1337x could not load " + url + ": " + String(error);
+            console.error(message);
+            throw new Error(message);
         }
-        return LoadDoc(html);
+    }
+
+    isChallenge(html) {
+        return /cf-chl-|Just a moment|Attention Required|captcha/i.test(html);
+    }
+
+    async browserPage(url, path) {
+        if (typeof ChromeDP === "undefined") throw new Error("Browser verification required, but ChromeDP is unavailable. Install Chrome/Chromium on the Seanime server and retry.");
+        let browser;
+        try {
+            browser = await ChromeDP.newBrowser();
+            await browser.navigate(url);
+            await browser.waitVisible(path.indexOf("/torrent/") === 0 ? 'a[href^="magnet:?"]' : ".box-info");
+            const html = await browser.outerHTML("html");
+            if (this.isChallenge(html)) throw new Error("Browser verification is still required");
+            return html;
+        } catch (error) {
+            throw new Error("Chrome could not load 1337x. Check that Chrome/Chromium is installed on the Seanime server and the site opens there. " + String(error));
+        } finally {
+            if (browser) await browser.close();
+        }
     }
 
     async search(opts) {

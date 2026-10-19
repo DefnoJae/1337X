@@ -56,10 +56,23 @@ test('magnet extraction decodes HTML entities and caches detail fetch', async ()
 });
 test('empty results, HTTP failures, challenges and changed layouts are distinct', async () => {
     assert.equal((await provider('<body>No results found</body>').p.getLatest()).length, 0);
-    await assert.rejects(provider('blocked', 503).p.getLatest(), /503/);
+    await assert.rejects(provider('blocked', 503).p.getLatest(), /ChromeDP is unavailable/);
     await assert.rejects(provider('<body>Just a moment</body>').p.getLatest(), /verification/);
     await assert.rejects(provider('<body>Unknown page</body>').p.getLatest(), /unexpected/);
     await assert.rejects(provider('<body>No magnet</body>').p.getTorrentMagnetLink({ link: 'https://1337x.to/torrent/1/x/' }), /No valid magnet/);
+});
+test('challenge response retries in Chrome and closes the browser', async () => {
+    let closed = 0;
+    const context = vm.createContext({ LoadDoc, console,
+        fetch: async () => ({ ok: false, status: 403, text: () => '<title>Just a moment</title>' }),
+        ChromeDP: { newBrowser: async () => ({ navigate: async () => {}, waitVisible: async () => {}, outerHTML: async () => html, close: async () => { closed++; } }) }
+    });
+    const p = vm.runInContext(source + ';new Provider()', context);
+    assert.equal((await p.search({ query: 'Show' })).length, 3);
+    assert.equal(closed, 1);
+    context.ChromeDP.newBrowser = async () => ({ navigate: async () => { throw new Error('navigation failed'); }, close: async () => { closed++; } });
+    await assert.rejects(p.getLatest(), /navigation failed/);
+    assert.equal(closed, 2);
 });
 test('manifest points to shipped payload and original logo', () => {
     const manifest = JSON.parse(fs.readFileSync('Manifest.json'));
