@@ -87,6 +87,9 @@ test('manifest points to shipped payload and original logo', () => {
     assert.equal(manifest.id, 'defnojae1337x');
     assert.equal(manifest.name, 'EXT Torrents');
     assert.equal(manifest.website, 'https://ext.to');
+    for (const field of manifest.userConfig.fields) if (field.type === 'select') {
+        assert.ok(field.options.every(option => option.label && option.value));
+    }
 });
 test('browser defaults to visible; preferences select headless and bound timeout', () => {
     const { p } = provider('');
