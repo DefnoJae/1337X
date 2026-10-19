@@ -1,1 +1,16 @@
 
+{
+  "id": "defnojae1337x",
+  "name": "1337x",
+  "version": "1.0.0",
+  "description": "1337x anime torrents: sub, dub, dual audio, episodes and batches.",
+  "author": "DefnoJae",
+  "type": "anime-torrent-provider",
+  "language": "javascript",
+  "lang": "multi",
+  "manifestURI": "https://raw.githubusercontent.com/DefnoJae/1337X/main/Manifest.json",
+  "payloadURI": "https://raw.githubusercontent.com/DefnoJae/1337X/main/provider.js",
+  "icon": "https://raw.githubusercontent.com/DefnoJae/1337X/main/assets/logo.png",
+  "website": "https://1337x.to",
+  "readme": "https://github.com/DefnoJae/1337X#readme"
+}

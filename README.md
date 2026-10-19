@@ -1,0 +1,25 @@
+# 1337x for Seanime
+
+<img src="assets/logo.png" width="100" alt="Original uploaded red X logo">
+
+Anime torrent provider with subbed, dubbed and dual-audio releases, episode searches, batches, resolution filtering and magnet/info-hash retrieval.
+
+## Install
+
+In Seanime, open **Extensions**, choose to add an extension, and paste this manifest URL:
+
+https://raw.githubusercontent.com/DefnoJae/1337X/main/Manifest.json
+
+## Search
+
+Search queries use 1337x's Anime category. All audio variants are included; add `dub`, `sub` or `dual audio` to your query to narrow results using the site's search. Smart search tries the English and Romaji titles, deduplicates results, and filters episode numbers, batches and resolution. Episode forms include `S01E03`, `E03`, `Episode 3` and ` - 03`; batches include ranges, complete collections and season packs. Titles without clear episode metadata remain visible in regular search.
+
+Batch searches return explicitly identifiable packs. Episode searches exclude packs. Results are title matches, not verified AniDB matches. Search currently reads the first results page per title; use a narrower custom query for crowded results. Season offsets and ambiguous episode names are not inferred. Latest releases use the anime listing.
+
+The original uploaded red X PNG is preserved unchanged in `assets/logo.png`.
+
+## Development
+
+Run `npm ci`, `npm run check` and `npm test`. Tests use HTML fixtures with an adapter matching Seanime's documented `LoadDoc` API; no torrents are downloaded. In Seanime's extension playground, select Anime Torrent Provider, paste `provider.js`, and exercise search, smartSearch, getLatest and both magnet methods.
+
+1337x availability and browser verification vary by network. HTTP errors, verification pages and unexpected layouts produce explicit errors. The extension does not bypass verification. A real Seanime playground check is needed to confirm operation on your network.

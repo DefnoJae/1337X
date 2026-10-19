@@ -1,0 +1,6 @@
+{
+  "name": "seanime-1337x",
+  "private": true,
+  "scripts": { "test": "node --test", "check": "node --check provider.js" },
+  "devDependencies": { "cheerio": "1.1.2" }
+}
