@@ -28,18 +28,29 @@ class Provider {
         return /cf-chl-|Just a moment|Attention Required|captcha/i.test(html);
     }
 
+    browserOptions() {
+        const preference = name => typeof $getUserPreference === "function" ? $getUserPreference(name) : "";
+        const requested = Number(preference("browserTimeout"));
+        return {
+            headless: String(preference("browserMode")) === "headless",
+            timeout: requested >= 30 && requested <= 120 ? requested : 60
+        };
+    }
+
     async browserPage(url, path) {
         if (typeof ChromeDP === "undefined") throw new Error("Browser verification required, but ChromeDP is unavailable. Install Chrome/Chromium on the Seanime server and retry.");
         let browser;
         try {
-            browser = await ChromeDP.newBrowser();
+            const options = this.browserOptions();
+            console.log("1337x: starting " + (options.headless ? "headless" : "visible") + " Chrome; timeout=" + options.timeout + "s");
+            browser = await ChromeDP.newBrowser(options);
             await browser.navigate(url);
-            await browser.waitVisible(path.indexOf("/torrent/") === 0 ? 'a[href^="magnet:?"]' : ".box-info");
+            await browser.waitVisible(path.indexOf("/torrent/") === 0 ? 'a[href^="magnet:?"]' : "table.table-list, .box-info");
             const html = await browser.outerHTML("html");
             if (this.isChallenge(html)) throw new Error("Browser verification is still required");
             return html;
         } catch (error) {
-            throw new Error("Chrome could not load 1337x. Check that Chrome/Chromium is installed on the Seanime server and the site opens there. " + String(error));
+            throw new Error("Chrome did not reach the expected 1337x page. In this extension's configuration, select Visible browser and retry; complete any verification in the Chrome window Seanime opens. A normal Chrome tab uses a separate session. If no window opens, check Chrome installation on the Seanime server. " + String(error));
         } finally {
             if (browser) await browser.close();
         }

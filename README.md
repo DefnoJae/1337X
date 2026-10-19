@@ -20,6 +20,10 @@ The original uploaded red X PNG is preserved unchanged in `assets/logo.png`.
 
 ## Development
 
+### Browser timeouts / verification
+
+Version 1.0.2 defaults to a **visible** fallback browser with a 60-second timeout. If prompted, complete verification yourself in the Chrome window opened by Seanime. Your existing Chrome tab has a separate session and does not clear verification for the provider. The browser closes when scraping completes or fails. This requires an interactive desktop on the Seanime server. In the extension configuration, choose **Headless browser** for servers without a display, and set a timeout between 30 and 120 seconds as needed. Verification may still prevent scraping; this is not a guaranteed workaround for site restrictions.
+
 Run `npm ci`, `npm run check` and `npm test`. Tests use HTML fixtures with an adapter matching Seanime's documented `LoadDoc` API; no torrents are downloaded. In Seanime's extension playground, select Anime Torrent Provider, paste `provider.js`, and exercise search, smartSearch, getLatest and both magnet methods.
 
 1337x availability and browser verification vary by network. On HTTP 403/503 or verification pages, the provider retries using Seanime's ChromeDP browser support. Install Chrome/Chromium on the machine running the Seanime server to enable this fallback. Browser sessions are closed after every attempt. If verification persists, the provider reports an actionable error and logs the URL and cause. Other HTTP failures and unexpected layouts also produce explicit errors. A real Seanime playground check is needed to confirm operation on your network.

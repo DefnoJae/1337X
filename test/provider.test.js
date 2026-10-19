@@ -80,3 +80,17 @@ test('manifest points to shipped payload and original logo', () => {
     assert.ok(manifest.payloadURI.endsWith('/main/provider.js'));
     assert.ok(fs.existsSync('assets/logo.png'));
 });
+test('browser defaults to visible; preferences select headless and bound timeout', () => {
+    const { p } = provider('');
+    assert.equal(p.browserOptions().headless, false);
+    assert.equal(p.browserOptions().timeout, 60);
+    const preferences = { browserMode: 'headless', browserTimeout: '90' };
+    const context = vm.createContext({ $getUserPreference: key => preferences[key] });
+    const configured = vm.runInContext(source + ';new Provider()', context);
+    assert.equal(configured.browserOptions().headless, true);
+    assert.equal(configured.browserOptions().timeout, 90);
+    preferences.browserTimeout = '999';
+    assert.equal(configured.browserOptions().timeout, 60);
+    preferences.browserTimeout = 'invalid';
+    assert.equal(configured.browserOptions().timeout, 60);
+});
