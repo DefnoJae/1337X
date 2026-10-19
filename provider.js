@@ -1,6 +1,6 @@
 // Seanime supplies fetch and LoadDoc. No browser or Node APIs are required.
 class Provider {
-    base = "https://1337x.to";
+    base = "https://ext.to";
 
     getSettings() {
         return { canSmartSearch: true, smartSearchFilters: ["query", "batch", "episodeNumber", "resolution"], supportsAdult: false, type: "main" };
@@ -12,13 +12,13 @@ class Provider {
             const response = await fetch(url);
             const html = await response.text();
             if (this.isChallenge(html) || response.status === 403 || response.status === 503) {
-                console.warn("1337x: HTTP " + response.status + "; trying Seanime Chrome browser for " + url);
+                console.warn("EXT.to: HTTP " + response.status + "; trying Seanime Chrome browser for " + url);
                 return LoadDoc(await this.browserPage(url, path));
             }
             if (!response.ok) throw new Error("HTTP " + response.status);
             return LoadDoc(html);
         } catch (error) {
-            const message = "1337x could not load " + url + ": " + String(error);
+            const message = "EXT.to could not load " + url + ": " + String(error);
             console.error(message);
             throw new Error(message);
         }
@@ -42,24 +42,34 @@ class Provider {
         let browser;
         try {
             const options = this.browserOptions();
-            console.log("1337x: starting " + (options.headless ? "headless" : "visible") + " Chrome; timeout=" + options.timeout + "s");
+            console.log("EXT.to: starting " + (options.headless ? "headless" : "visible") + " Chrome; timeout=" + options.timeout + "s");
             browser = await ChromeDP.newBrowser(options);
             await browser.navigate(url);
-            await browser.waitVisible(path.indexOf("/torrent/") === 0 ? 'a[href^="magnet:?"]' : "table.table-list, .box-info");
+            await this.waitForContent(browser);
             const html = await browser.outerHTML("html");
             if (this.isChallenge(html)) throw new Error("Browser verification is still required");
             return html;
         } catch (error) {
-            throw new Error("Chrome did not reach the expected 1337x page. In this extension's configuration, select Visible browser and retry; complete any verification in the Chrome window Seanime opens. A normal Chrome tab uses a separate session. If no window opens, check Chrome installation on the Seanime server. " + String(error));
+            throw new Error("Chrome did not reach the expected EXT.to page. In this extension's configuration, select Visible browser and retry; complete any verification in the Chrome window Seanime opens. A normal Chrome tab uses a separate session. If no window opens, check Chrome installation on the Seanime server. " + String(error));
         } finally {
             if (browser) await browser.close();
         }
     }
 
+    async waitForContent(browser) {
+        const deadline = Date.now() + (this.browserOptions().timeout - 5) * 1000;
+        while (Date.now() < deadline) {
+            const ready = await browser.evaluate(`!!(document.querySelector('table.search-table, a[href^="magnet:?"]') || window.pageToken || /no results|nothing found|no torrents|no records/i.test(document.body ? document.body.innerText : ''))`);
+            if (ready) return;
+            await browser.sleep(500);
+        }
+        throw new Error("EXT.to verification did not finish before the timeout");
+    }
+
     async search(opts) {
         const query = (opts.query || "").trim();
         if (!query || (opts.media && opts.media.isAdult)) return [];
-        return this.list("/category-search/" + encodeURIComponent(query) + "/Anime/1/");
+        return this.list("/browse/?q=" + encodeURIComponent(query).replace(/%20/g, "+") + "&cat=7&with_adult=0");
     }
 
     async smartSearch(opts) {
@@ -106,31 +116,71 @@ class Provider {
     async list(path) {
         const $ = await this.page(path);
         const results = [];
-        $("table tbody tr").each((i, row) => {
-            const anchor = row.find('a[href^="/torrent/"]').first();
+        $("table.search-table tr").each((i, row) => {
+            const anchor = row.find('a.torrent-title-link').first();
             const href = anchor.attr("href");
             const name = anchor.text().trim();
             if (!href || !name) return;
-            const number = selector => +(row.find(selector).text().replace(/[^\d]/g, "")) || 0;
-            results.push(Object.assign({ name, date: "", size: this.sizeBytes(row.find("td.size").text()), formattedSize: "", seeders: number("td.seeds"), leechers: number("td.leeches"), downloadCount: 0, link: this.base + href, isBestRelease: false, confirmed: false }, this.metadata(name)));
+            const link = href.indexOf(this.base + "/") === 0 ? href : /^\/(?!\/)[^?#]+-\d+\/?$/.test(href) ? this.base + href : "";
+            if (!link || !/-\d+\/?$/.test(link)) return;
+            const cells = row.find("td");
+            const number = index => +(cells.eq(index).text().replace(/[^\d]/g, "")) || 0;
+            const rawDate = cells.eq(3).text().trim();
+            const parsedDate = Date.parse(rawDate);
+            results.push(Object.assign({ name, date: isNaN(parsedDate) ? "" : new Date(parsedDate).toISOString(), size: this.sizeBytes(cells.eq(1).text()), formattedSize: "", seeders: number(4), leechers: number(5), downloadCount: 0, link, isBestRelease: false, confirmed: false }, this.metadata(name)));
         });
-        if (!results.length && !/no results|nothing found|no torrents/i.test($("body").text()) && !$("table").length()) {
-            throw new Error("1337x returned an unexpected page; the site may be unavailable or its layout changed.");
+        if (!results.length && !/no results|nothing found|no torrents|no records/i.test($("body").text()) && !$("table.search-table").length()) {
+            throw new Error("EXT.to returned an unexpected page; the site may be unavailable or its layout changed.");
         }
         return results;
     }
 
-    async getLatest() { return this.list("/anime/"); }
+    async getLatest() { return this.list("/browse/?cat=7&sort=age&order=desc&with_adult=0"); }
 
     async getTorrentMagnetLink(torrent) {
         if (torrent.magnetLink) return torrent.magnetLink;
         // Only request detail pages on the configured origin.
-        if (torrent.link.indexOf(this.base + "/torrent/") !== 0) throw new Error("Invalid 1337x detail URL");
+        if (!torrent.link || torrent.link.indexOf(this.base + "/") !== 0 || !/^\/(?!\/)[^?#]+-\d+\/?$/.test(torrent.link.slice(this.base.length))) throw new Error("Invalid EXT.to detail URL");
         const $ = await this.page(torrent.link.slice(this.base.length));
-        const magnet = $('a[href^="magnet:?"]').first().attr("href");
-        if (!magnet || !/[?&]xt=urn:btih:([a-f0-9]{40}|[a-z2-7]{32})(?:&|$)/i.test(magnet)) throw new Error("No valid magnet link found on 1337x detail page");
+        let magnet = $('a[href^="magnet:?"]').first().attr("href");
+        if (!magnet) magnet = await this.resolveMagnetInBrowser(torrent.link);
+        if (!magnet || !/[?&]xt=urn:btih:([a-f0-9]{40}|[a-z2-7]{32})(?:&|$)/i.test(magnet)) throw new Error("No valid magnet link found on EXT.to detail page");
         torrent.magnetLink = magnet;
         return magnet;
+    }
+
+    async resolveMagnetInBrowser(url) {
+        if (typeof ChromeDP === "undefined") throw new Error("EXT.to magnet resolution requires Seanime ChromeDP and Chrome/Chromium.");
+        let browser;
+        try {
+            browser = await ChromeDP.newBrowser(this.browserOptions());
+            await browser.navigate(url);
+            await this.waitForContent(browser);
+            // EXT's endpoint needs page tokens and cookies from this same session.
+            const expression = `(async () => {
+                const existing = document.querySelector('a[href^="magnet:?"]');
+                if (existing) return existing.getAttribute('href');
+                const id = location.pathname.match(/-(\\d+)\\/?$/);
+                if (!id || !window.pageToken || !window.csrfToken) throw new Error('EXT magnet page tokens missing; verification may be incomplete');
+                const timestamp = String(Math.floor(Date.now() / 1000));
+                const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(id[1] + '|' + timestamp + '|' + window.pageToken));
+                const hmac = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+                const response = await fetch('/ajax/getTorrentMagnet.php', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: new URLSearchParams({torrent_id:id[1],action:'get_magnet',timestamp,hmac,sessid:window.csrfToken}).toString()
+                });
+                if (!response.ok) throw new Error('EXT magnet HTTP ' + response.status);
+                const data = await response.json();
+                if (!data.success || !data.magnet) throw new Error(data.error || 'EXT did not return a magnet');
+                return data.magnet;
+            })()`;
+            const response = await browser.executeCDP("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+            if (response.exceptionDetails) throw new Error("EXT magnet request failed: " + JSON.stringify(response.exceptionDetails));
+            return response.result && response.result.value || "";
+        } finally {
+            if (browser) await browser.close();
+        }
     }
 
     async getTorrentInfoHash(torrent) {

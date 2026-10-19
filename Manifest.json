@@ -1,9 +1,8 @@
-
 {
   "id": "defnojae1337x",
-  "name": "1337x",
-  "version": "1.0.2",
-  "description": "1337x anime torrents: sub, dub, dual audio, episodes and batches.",
+  "name": "EXT Torrents",
+  "version": "2.0.0",
+  "description": "EXT.to anime torrents: sub, dub, dual audio, episodes and batches. Replaces the former 1337x provider.",
   "author": "DefnoJae",
   "type": "anime-torrent-provider",
   "language": "javascript",
@@ -11,17 +10,34 @@
   "manifestURI": "https://raw.githubusercontent.com/DefnoJae/1337X/main/Manifest.json",
   "payloadURI": "https://raw.githubusercontent.com/DefnoJae/1337X/main/provider.js",
   "icon": "https://raw.githubusercontent.com/DefnoJae/1337X/main/assets/logo.png",
-  "website": "https://1337x.to",
+  "website": "https://ext.to",
   "readme": "https://github.com/DefnoJae/1337X#readme",
   "userConfig": {
     "version": 1,
     "requiresConfig": false,
     "fields": [
-      { "name": "browserMode", "label": "Browser fallback mode", "type": "select", "default": "visible", "options": [
-        { "name": "Visible browser (complete verification if prompted)", "value": "visible" },
-        { "name": "Headless browser (servers without a display)", "value": "headless" }
-      ] },
-      { "name": "browserTimeout", "label": "Browser timeout in seconds (30–120)", "type": "text", "default": "60" }
+      {
+        "name": "browserMode",
+        "label": "Browser fallback mode",
+        "type": "select",
+        "default": "visible",
+        "options": [
+          {
+            "name": "Visible browser (complete verification if prompted)",
+            "value": "visible"
+          },
+          {
+            "name": "Headless browser (servers without a display)",
+            "value": "headless"
+          }
+        ]
+      },
+      {
+        "name": "browserTimeout",
+        "label": "Browser timeout in seconds (30–120)",
+        "type": "text",
+        "default": "60"
+      }
     ]
   }
 }

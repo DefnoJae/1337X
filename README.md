@@ -1,29 +1,35 @@
-# 1337x for Seanime
+# EXT Torrents for Seanime
 
 <img src="assets/logo.png" width="100" alt="Original uploaded red X logo">
 
-Anime torrent provider with subbed, dubbed and dual-audio releases, episode searches, batches, resolution filtering and magnet/info-hash retrieval.
+Anime torrent provider for https://ext.to/: sub, dub, dual audio, episodes, batches, resolution filters, latest releases and magnet/info-hash retrieval.
 
-## Install
+## Install or update
 
-In Seanime, open **Extensions**, choose to add an extension, and paste this manifest URL:
+In Seanime Extensions, add this manifest URL:
 
 https://raw.githubusercontent.com/DefnoJae/1337X/main/Manifest.json
 
+Existing users: update the installed extension. Version 2.0.0 replaces 1337x with EXT Torrents. The ID `defnojae1337x` and repository URL remain unchanged so existing installations can update. No requests go to 1337x. The original uploaded red X PNG is preserved unchanged.
+
 ## Search
 
-Search queries use 1337x's Anime category. All audio variants are included; add `dub`, `sub` or `dual audio` to your query to narrow results using the site's search. Smart search tries the English and Romaji titles, deduplicates results, and filters episode numbers, batches and resolution. Episode forms include `S01E03`, `E03`, `Episode 3` and ` - 03`; batches include ranges, complete collections and season packs. Titles without clear episode metadata remain visible in regular search.
+Queries use EXT's `/browse/` endpoint, anime category `7`, and `with_adult=0`. All audio variants are included; add `dub`, `sub` or `dual audio` to your custom query to narrow results. Smart search tries English and Romaji titles, deduplicates, and filters episodes, batches and resolution. One results page is read per title. Matches are title-based, not verified AniDB matches.
 
-Batch searches return explicitly identifiable packs. Episode searches exclude packs. Results are title matches, not verified AniDB matches. Search currently reads the first results page per title; use a narrower custom query for crowded results. Season offsets and ambiguous episode names are not inferred. Latest releases use the anime listing.
+Episode forms include `S01E03`, `E03`, `Episode 3` and ` - 03`. Packs include explicit ranges, complete collections and season packs. Episode searches exclude packs; batch searches require identifiable packs. Unknown episode names remain in regular search. Season offsets are not inferred.
 
-The original uploaded red X PNG is preserved unchanged in `assets/logo.png`.
+Static magnets are read directly when present. Otherwise Chrome loads the detail page and requests EXT's magnet endpoint using that same browser session's page tokens and cookies. The provider returns a magnet URI without starting a download or opening a torrent client.
 
-## Development
+## Browser verification
 
-### Browser timeouts / verification
+EXT can return Cloudflare verification pages, including HTTP 403. The provider uses Seanime ChromeDP as a fallback. Install Chrome/Chromium on the machine running the Seanime server. The default is a visible browser and a 60-second timeout; complete any verification yourself in that browser. Your regular browser uses a separate session. Browser sessions close after completion or failure.
 
-Version 1.0.2 defaults to a **visible** fallback browser with a 60-second timeout. If prompted, complete verification yourself in the Chrome window opened by Seanime. Your existing Chrome tab has a separate session and does not clear verification for the provider. The browser closes when scraping completes or fails. This requires an interactive desktop on the Seanime server. In the extension configuration, choose **Headless browser** for servers without a display, and set a timeout between 30 and 120 seconds as needed. Verification may still prevent scraping; this is not a guaranteed workaround for site restrictions.
+Extension configuration supports headless mode for servers without a display, and timeouts from 30 to 120 seconds. Verification can still prevent scraping. Changing the source does not guarantee availability. Failures are reported rather than returned as empty results.
 
-Run `npm ci`, `npm run check` and `npm test`. Tests use HTML fixtures with an adapter matching Seanime's documented `LoadDoc` API; no torrents are downloaded. In Seanime's extension playground, select Anime Torrent Provider, paste `provider.js`, and exercise search, smartSearch, getLatest and both magnet methods.
+## Validation
 
-1337x availability and browser verification vary by network. On HTTP 403/503 or verification pages, the provider retries using Seanime's ChromeDP browser support. Install Chrome/Chromium on the machine running the Seanime server to enable this fallback. Browser sessions are closed after every attempt. If verification persists, the provider reports an actionable error and logs the URL and cause. Other HTTP failures and unexpected layouts also produce explicit errors. A real Seanime playground check is needed to confirm operation on your network.
+Run `npm ci`, `npm run check` and `npm test`. Tests use fixtures and mocks; they do not download torrents.
+
+Live migration checks: EXT's homepage loaded in the browser, and its anime navigation resolved to category 7. Direct requests and browser search requests encountered Cloudflare verification. Successful live search and magnet resolution have not been established on this network.
+
+Protocol reference: [EXT Torznab integration](https://github.com/huseyincig/extto-torznab-proxy/blob/main/server.js). This is an independent Seanime implementation and does not require that service.

@@ -1,6 +1,11 @@
 {
-  "name": "seanime-1337x",
+  "name": "seanime-ext-torrents",
   "private": true,
-  "scripts": { "test": "node --test", "check": "node --check provider.js" },
-  "devDependencies": { "cheerio": "1.1.2" }
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check provider.js"
+  },
+  "devDependencies": {
+    "cheerio": "1.1.2"
+  }
 }

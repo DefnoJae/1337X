@@ -8,7 +8,7 @@ const source = fs.readFileSync('provider.js', 'utf8');
 function LoadDoc(html) {
     const $ = cheerio.load(html);
     const wrap = selection => ({
-        find: s => wrap(selection.find(s)), first: () => wrap(selection.first()),
+        find: s => wrap(selection.find(s)), first: () => wrap(selection.first()), eq: i => wrap(selection.eq(i)),
         text: () => selection.text(), attr: k => selection.attr(k), length: () => selection.length,
         each: cb => selection.each((i, node) => cb(i, wrap($(node))))
     });
@@ -20,9 +20,9 @@ function provider(html, status = 200) {
     return { p: vm.runInContext(source + ';new Provider()', context), calls };
 }
 function row(id, title, seeds = 20) {
-    return `<tr><td><a href='/category/Anime/'>Anime</a><a href='/torrent/${id}/title/'>${title}</a></td><td class='seeds'>${seeds}</td><td class='leeches'>3</td><td class='size'>1.5 GB<span>uploader</span></td></tr>`;
+    return `<tr><td><a href='/anime/'>Anime</a><a class='torrent-title-link' href='/show-${id}/'>${title}</a></td><td>1.5 GB</td><td>video</td><td>2026-10-19</td><td>${seeds}</td><td>3</td></tr>`;
 }
-const html = '<table><tbody>' + row(1, '[Group] Show - 03 [1080p] [Sub]') + row(2, 'Show S01E03 720p English Dub') + row(3, 'Show 01-12 Complete 1080p Dual Audio') + '</tbody></table>';
+const html = '<table class="search-table"><tbody>' + row(1, '[Group] Show - 03 [1080p] [Sub]') + row(2, 'Show S01E03 720p English Dub') + row(3, 'Show 01-12 Complete 1080p Dual Audio') + '</tbody></table>';
 test('parses all audio variants, size and episode metadata', async () => {
     const { p, calls } = provider(html);
     const results = await p.search({ query: 'Show & Other', media: {} });
@@ -32,7 +32,7 @@ test('parses all audio variants, size and episode metadata', async () => {
     assert.equal(results[1].episodeNumber, 3);
     assert.equal(results[2].isBatch, true);
     assert.equal(results[0].confirmed, false);
-    assert.match(calls[0], /Show%20%26%20Other\/Anime\/1\/$/);
+    assert.equal(calls[0], 'https://ext.to/browse/?q=Show+%26+Other&cat=7&with_adult=0');
 });
 test('smart search filters episodes, batches and resolution and deduplicates aliases', async () => {
     const { p } = provider(html);
@@ -47,7 +47,7 @@ test('smart search filters episodes, batches and resolution and deduplicates ali
 test('magnet extraction decodes HTML entities and caches detail fetch', async () => {
     const hash = 'abcdef0123456789abcdef0123456789abcdef01';
     const { p, calls } = provider(`<a href='magnet:?xt=urn:btih:${hash}&amp;dn=Show'>Magnet</a>`);
-    const torrent = { link: p.base + '/torrent/1/show/' };
+    const torrent = { link: p.base + '/show-1/' };
     assert.equal(await p.getTorrentInfoHash(torrent), hash);
     assert.match(await p.getTorrentMagnetLink(torrent), /&dn=Show$/);
     assert.equal(calls.length, 1);
@@ -59,13 +59,13 @@ test('empty results, HTTP failures, challenges and changed layouts are distinct'
     await assert.rejects(provider('blocked', 503).p.getLatest(), /ChromeDP is unavailable/);
     await assert.rejects(provider('<body>Just a moment</body>').p.getLatest(), /verification/);
     await assert.rejects(provider('<body>Unknown page</body>').p.getLatest(), /unexpected/);
-    await assert.rejects(provider('<body>No magnet</body>').p.getTorrentMagnetLink({ link: 'https://1337x.to/torrent/1/x/' }), /No valid magnet/);
+    await assert.rejects(provider('<body>No magnet</body>').p.getTorrentMagnetLink({ link: 'https://ext.to/show-1/' }), /requires Seanime ChromeDP/);
 });
 test('challenge response retries in Chrome and closes the browser', async () => {
     let closed = 0;
     const context = vm.createContext({ LoadDoc, console,
         fetch: async () => ({ ok: false, status: 403, text: () => '<title>Just a moment</title>' }),
-        ChromeDP: { newBrowser: async () => ({ navigate: async () => {}, waitVisible: async () => {}, outerHTML: async () => html, close: async () => { closed++; } }) }
+        ChromeDP: { newBrowser: async () => ({ navigate: async () => {}, evaluate: async () => true, outerHTML: async () => html, close: async () => { closed++; } }) }
     });
     const p = vm.runInContext(source + ';new Provider()', context);
     assert.equal((await p.search({ query: 'Show' })).length, 3);
@@ -79,6 +79,9 @@ test('manifest points to shipped payload and original logo', () => {
     assert.equal(manifest.type, 'anime-torrent-provider');
     assert.ok(manifest.payloadURI.endsWith('/main/provider.js'));
     assert.ok(fs.existsSync('assets/logo.png'));
+    assert.equal(manifest.id, 'defnojae1337x');
+    assert.equal(manifest.name, 'EXT Torrents');
+    assert.equal(manifest.website, 'https://ext.to');
 });
 test('browser defaults to visible; preferences select headless and bound timeout', () => {
     const { p } = provider('');
@@ -93,4 +96,39 @@ test('browser defaults to visible; preferences select headless and bound timeout
     assert.equal(configured.browserOptions().timeout, 60);
     preferences.browserTimeout = 'invalid';
     assert.equal(configured.browserOptions().timeout, 60);
+});
+test('token-based magnets use the browser session and correct signature', async () => {
+    const crypto = require('node:crypto');
+    const hash = 'abcdef0123456789abcdef0123456789abcdef01';
+    let closed = 0;
+    const context = vm.createContext({ LoadDoc,
+        fetch: async () => ({ok:true,status:200,text:()=>'<body>Detail page</body>'}),
+        ChromeDP: {newBrowser: async () => ({
+            navigate: async url => assert.equal(url, 'https://ext.to/show-123/'),
+            evaluate: async () => true,
+            executeCDP: async (method, args) => {
+                assert.equal(method, 'Runtime.evaluate');
+                assert.equal(args.awaitPromise, true);
+                const browserContext = vm.createContext({
+                    document: {querySelector:()=>null}, location:{pathname:'/show-123/'},
+                    window:{pageToken:'page-token',csrfToken:'csrf-token'},
+                    crypto:crypto.webcrypto, TextEncoder, URLSearchParams,
+                    fetch: async (url, options) => {
+                        assert.equal(url, '/ajax/getTorrentMagnet.php');
+                        assert.equal(options.credentials, 'same-origin');
+                        const body = new URLSearchParams(options.body);
+                        assert.equal(body.get('torrent_id'), '123');
+                        assert.equal(body.get('sessid'), 'csrf-token');
+                        assert.equal(body.get('action'), 'get_magnet');
+                        assert.equal(body.get('hmac'), crypto.createHash('sha256').update('123|' + body.get('timestamp') + '|page-token').digest('hex'));
+                        return {ok:true,json:async()=>({success:true,magnet:'magnet:?xt=urn:btih:' + hash})};
+                    }
+                });
+                return {result:{value:await vm.runInContext(args.expression,browserContext)}};
+            }, close: async () => {closed++;}
+        })}
+    });
+    const p = vm.runInContext(source + ';new Provider()',context);
+    assert.equal(await p.getTorrentInfoHash({link:'https://ext.to/show-123/'}),hash);
+    assert.equal(closed,1);
 });
