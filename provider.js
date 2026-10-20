@@ -3,7 +3,9 @@ class Provider {
     base = "https://ext.to";
 
     helperEnabled() {
-        return typeof $getUserPreference === "function" && $getUserPreference("browserMode") === "cloak";
+        const mode = typeof $getUserPreference === "function" ? $getUserPreference("browserMode") : "";
+        // Keep the separately launched CloakBrowser as the default browser.
+        return !mode || mode === "cloak";
     }
 
     async helperRequest(endpoint, path) {

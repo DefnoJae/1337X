@@ -24,6 +24,8 @@ Static magnets are read directly when present. Otherwise Chrome loads the detail
 
 ### Local CloakBrowser helper (version 2.1.0)
 
+Version 2.1.2 restores the separate CloakBrowser helper as the default. Existing installations with an explicitly saved browser mode should select **Local CloakBrowser helper** in preferences. Stock Chrome remains an explicit optional mode.
+
 Install Node.js 20.19+ and run `npm ci`, then `npm run helper` from this repository on the **same machine as the Seanime server**. The first search downloads the free CloakBrowser Chromium binary into `.ext-helper/browser/` and verifies its published checksum. A visible browser uses a dedicated persistent profile in `.ext-helper/profile/`. This is separate from your regular Chrome profile.
 
 In Seanime, update EXT Torrents, open its configuration, choose **Local CloakBrowser helper**, and copy the `token` value from `.ext-helper/connection.json` into **Local helper token**. Keep the helper running while using this mode. Stop it with Ctrl+C. It does not install a startup task or run as a Windows service.

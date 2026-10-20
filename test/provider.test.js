@@ -16,7 +16,7 @@ function LoadDoc(html) {
 }
 function provider(html, status = 200) {
     const calls = [];
-    const context = vm.createContext({ LoadDoc, fetch: async url => { calls.push(url); return { ok: status === 200, status, text: async () => html }; } });
+    const context = vm.createContext({ LoadDoc, $getUserPreference: key => key === 'browserMode' ? 'visible' : '', fetch: async url => { calls.push(url); return { ok: status === 200, status, text: async () => html }; } });
     return { p: vm.runInContext(source + ';new Provider()', context), calls };
 }
 function row(id, title, seeds = 20) {
@@ -68,7 +68,7 @@ test('ordinary EXT captcha script references are not mistaken for challenge page
 });
 test('challenge response retries in Chrome and closes the browser', async () => {
     let closed = 0;
-    const context = vm.createContext({ LoadDoc, console,
+    const context = vm.createContext({ LoadDoc, console, $getUserPreference: key => key === 'browserMode' ? 'visible' : '',
         fetch: async () => ({ ok: false, status: 403, text: () => '<title>Just a moment</title>' }),
         ChromeDP: { newBrowser: async () => ({ navigate: async () => {}, evaluate: async () => true, outerHTML: async () => html, close: async () => { closed++; } }) }
     });
@@ -109,7 +109,7 @@ test('token-based magnets use the browser session and correct signature', async 
     const crypto = require('node:crypto');
     const hash = 'abcdef0123456789abcdef0123456789abcdef01';
     let closed = 0;
-    const context = vm.createContext({ LoadDoc,
+    const context = vm.createContext({ LoadDoc, $getUserPreference: key => key === 'browserMode' ? 'visible' : '',
         fetch: async () => ({ok:true,status:200,text:()=>'<body>Detail page</body>'}),
         ChromeDP: {newBrowser: async () => ({
             navigate: async url => assert.equal(url, 'https://ext.to/show-123/'),
@@ -154,4 +154,11 @@ test('Cloak helper mode routes search and magnets over authenticated loopback',a
     assert.equal(calls[0].url,'http://127.0.0.1:18731/page');
     assert.equal(calls[0].options.headers.Authorization,'Bearer test-token');
     assert.equal(calls[1].url,'http://127.0.0.1:18731/magnet');
+});
+test('unset browser preference uses the separate CloakBrowser helper',()=>{
+    const context=vm.createContext({});
+    const p=vm.runInContext(source+';new Provider()',context);
+    assert.equal(p.helperEnabled(),true);
+    const manifest=JSON.parse(fs.readFileSync('Manifest.json'));
+    assert.equal(manifest.userConfig.fields.find(f=>f.name==='browserMode').default,'cloak');
 });

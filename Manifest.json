@@ -1,7 +1,7 @@
 {
   "id": "defnojae1337x",
   "name": "EXT Torrents",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "EXT.to anime torrents: sub, dub, dual audio, episodes and batches. Replaces the former 1337x provider.",
   "author": "DefnoJae",
   "type": "anime-torrent-provider",
@@ -13,14 +13,14 @@
   "website": "https://ext.to",
   "readme": "https://github.com/DefnoJae/1337X#readme",
   "userConfig": {
-    "version": 3,
+    "version": 4,
     "requiresConfig": false,
     "fields": [
       {
         "name": "browserMode",
         "label": "Browser fallback mode",
         "type": "select",
-        "default": "visible",
+        "default": "cloak",
         "options": [
           {
             "value": "visible",
