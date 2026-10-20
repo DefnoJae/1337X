@@ -13,7 +13,7 @@
   "website": "https://ext.to",
   "readme": "https://github.com/DefnoJae/1337X#readme",
   "userConfig": {
-    "version": 4,
+    "version": 3,
     "requiresConfig": false,
     "fields": [
       {
